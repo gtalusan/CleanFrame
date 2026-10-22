@@ -38,14 +38,51 @@
     if (!IDS[brand]) { done({message: 'This app has no launch target.'}); return; }
     launchApp(IDS[brand], done);
   }
-  function art(done) {
-    if (!api()) { unavailable(done); return; }
+  /* Q90T fork: HDMI source switching replaces the Frame-only Art Mode control.
+     Tizen 5.5's setSource takes the SystemInfoVideoSourceInfo object reported
+     by VIDEOSOURCE, not a bare source name. */
+  function source(name, done) {
+    if (!window.tizen || !tizen.tvwindow || !tizen.systeminfo) { unavailable(done); return; }
     var finish = bounded(done);
+    var match = /^HDMI([0-9]+)$/.exec(name), number = match ? parseInt(match[1], 10) : 0;
+    if (!number) { finish({ message: 'Unknown source ' + name + '.' }); return; }
     try {
-      var data = [new tizen.ApplicationControlData('mode', ['fullscreen']), new tizen.ApplicationControlData('requester', ['mobile'])];
-      var control = new tizen.ApplicationControl('http://tizen.org/appcontrol/operation/default', null, null, null, data);
-      api().launchAppControl(control, 'org.tizen.art-app', function () { finish(null); }, function (err) { finish(failure(err)); });
+      tizen.systeminfo.getPropertyValue('VIDEOSOURCE', function (info) {
+        var all = (info.connected || []).concat(info.disconnected || []), found = null, i;
+        for (i = 0; i < all.length; i++) {
+          if (all[i].type === 'HDMI' && all[i].number === number) { found = all[i]; break; }
+        }
+        if (!found) { finish({ message: 'HDMI ' + number + ' is not reported by the TV.' }); return; }
+        tizen.tvwindow.setSource(found, function () {
+          /* Show the selected source full-screen inside the launcher; Back returns Home. */
+          tizen.tvwindow.show(function () { finish(null); }, function (err) { finish(failure(err)); }, ['0px', '0px', '1920px', '1080px'], 'MAIN');
+        }, function (err) { finish(failure(err)); }, 'MAIN');
+      }, function (err) { finish(failure(err)); });
     } catch (err) { finish(failure(err)); }
+  }
+  function hideSource(done) {
+    if (!window.tizen || !tizen.tvwindow) { unavailable(done); return; }
+    var finish = bounded(done);
+    try { tizen.tvwindow.hide(function () { finish(null); }, function (err) { finish(failure(err)); }, 'MAIN'); }
+    catch (err) { finish(failure(err)); }
+  }
+  /* Q90T fork: EDID-derived input names from the local EdidService bridge
+     (http://127.0.0.1:8787/). Fails gracefully when the service is absent. */
+  function sourceNames(done) {
+    var finish = bounded(done), xhr;
+    try {
+      xhr = new XMLHttpRequest();
+      xhr.open('GET', 'http://127.0.0.1:8787/', true);
+      xhr.timeout = 4000;
+      xhr.onload = function () {
+        if (xhr.status !== 200) { finish({ message: 'Name service unavailable.' }); return; }
+        try { finish(null, JSON.parse(xhr.responseText)); }
+        catch (e) { finish({ message: 'Name service returned bad data.' }); }
+      };
+      xhr.onerror = function () { finish({ message: 'Name service unavailable.' }); };
+      xhr.ontimeout = function () { finish({ message: 'Name service unavailable.' }); };
+      xhr.send();
+    } catch (e) { finish({ message: 'Name service unavailable.' }); }
   }
   function home(done) { launchApp('com.samsung.tv.csfs', done); }
   function settings(done) { launchApp('com.samsung.tv.coba.setting', done); }
@@ -70,5 +107,5 @@
       }, function (err) { finish(failure(err)); });
     } catch (err) { finish(failure(err)); }
   }
-  window.FrameDevice = { launch: launch, launchApp: launchApp, art: art, home: home, settings: settings, apps: apps };
+  window.FrameDevice = { launch: launch, launchApp: launchApp, source: source, hideSource: hideSource, sourceNames: sourceNames, home: home, settings: settings, apps: apps };
 }());

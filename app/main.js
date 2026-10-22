@@ -11,20 +11,24 @@
   var PH_TOP = 220, PH_PITCH = 128, PH_FULL = 5, PH_HEIGHT = 944, PH_COMPACT_TOP = 144, PH_COMPACT_PITCH = 88, PH_COMPACT_VISIBLE = 9;
   var WALL_VISIBLE = 6, WALL_ROW = 92, WALL_DELAY = 200;
   var KEYS = { 37: 'left', 38: 'up', 39: 'right', 40: 'down', 13: 'ok', 27: 'back', 8: 'back', 10009: 'back', 461: 'back' };
-  var FULL = 'Home holds nine apps. Remove one first.', LAST = 'Home needs one app';
+  var FULL = 'Home holds nine tiles. Remove one first.', LAST = 'Home needs one tile';
 
+  /* Q90T fork: Home is the input sources, not streaming apps or launcher
+     controls. The All apps panel and the Apps on Home editor still work for
+     any app you later add from the TV. Settings stays in the top-right. */
   var PRIMARY_APPS = [
-    { id: 'stremio', name: 'Stremio', mark: true, appId: 'IkWsFHtOY9.Stremio' },
-    { id: 'netflix', name: 'Netflix', mark: true, appId: 'org.tizen.netflix-app' },
-    { id: 'disneyplus', name: 'Disney+', mark: true, appId: 'MCmYXNxgcu.DisneyPlus' },
-    { id: 'youtube', name: 'YouTube', mark: true, appId: '9Ur5IzDKqV.TizenYouTube' },
-    { id: 'appletv', name: 'Apple TV', mark: true, appId: 'com.samsung.tv.aria-video' },
-    { id: 'primevideo', name: 'Prime Video', mark: true, appId: 'org.tizen.primevideo' },
-    { id: 'abciview', name: 'ABC iview', mark: true, appId: 'mWK87Xghap.ABCiview' },
-    { id: 'sbs', name: 'SBS On Demand', mark: true, appId: 'OyE7OuxlUi.SBSOnDemand' },
-    { id: 'applemusic', name: 'Apple Music', mark: true, appId: 'org.tizen.apple.apple-music' }
+    { id: 'hdmi1', name: 'HDMI 1', mark: true, brand: 'hdmi', source: 'HDMI1' },
+    { id: 'hdmi2', name: 'HDMI 2', mark: true, brand: 'hdmi', source: 'HDMI2' },
+    { id: 'hdmi3', name: 'HDMI 3', mark: true, brand: 'hdmi', source: 'HDMI3' },
+    { id: 'hdmi4', name: 'HDMI 4', mark: true, brand: 'hdmi', source: 'HDMI4' }
   ];
   var PRIMARY = PRIMARY_APPS.map(function (a) { return a.id; }), APPS = PRIMARY_APPS.slice(), ALPHA = [];
+  /* Q90T fork: apply Smart Hub source labels (assets/input-labels.js) over the
+     default input names. Empty labels keep the default. */
+  Object.keys(window.Q90TInputLabels || {}).forEach(function (key) {
+    var labelled = app(key), label = window.Q90TInputLabels[key];
+    if (labelled && label) labelled.name = String(label).slice(0, 40);
+  });
   var WALLS = window.CleanFrameWallpapers || [{ id: 'misty', name: 'Misty coast', tone: 'light', ut: { tr: 'mist', br: 'mist' }, frostVeil: .20 }];
   var ADAPTIVE_INK = window.CleanFrameAdaptiveInk || {};
   WALLS.forEach(function (w) { w.ut = w.ut || { tr: 'light', br: 'light' }; w.frostVeil = w.frostVeil || .12; });
@@ -78,7 +82,8 @@
     undo: [], removedAt: {}, note: null, err: null,
     writes: 0, failed: 0, log: [], logN: 0, lastLaunch: null, press: null,
     wallShown: null, wallPending: null, wallError: null,
-    shown: null, pending: null, lookError: null, bundleKey: null, previewBundle: null, reflow: false, fontSwitch: false
+    shown: null, pending: null, lookError: null, bundleKey: null, previewBundle: null, reflow: false, fontSwitch: false,
+    sourceShown: null
   };
   var scroll = { first: 0, off: 0, photo: 0, photoArrange: 0 };
   function pick(v, list, fallback) {
@@ -368,6 +373,25 @@
     if (saved && initial.mode === 'open') initial.wall = WALLS[(wallIndex(initial.wall) + 1) % WALLS.length].id;
     // Keep the old schema keys alongside the builder values for in-place updates.
     try { localStorage.setItem(KEY, JSON.stringify(serialise(initial))); S.c = initial; storageOk = true; } catch (e) { storageOk = false; }
+    bootSourceNames();
+  }
+  /* Q90T fork: start the local EdidService bridge and pull its EDID-derived
+     input names. Fails silently; tiles keep their default names. */
+  function bootSourceNames() {
+    if (!FrameDevice || !FrameDevice.sourceNames) return;
+    FrameDevice.launchApp('EdidServi1.EdidService', function () {});
+    window.setTimeout(function () { refreshSourceNames(); }, 2000);
+  }
+  function refreshSourceNames() {
+    FrameDevice.sourceNames(function (err, names) {
+      var changed = false, key;
+      if (err || !names) return;
+      for (key in names) {
+        var a = app(key), label = names[key];
+        if (a && label && a.name !== label) { a.name = label; changed = true; }
+      }
+      if (changed) render();
+    });
   }
   function clearSession() { S.undo = []; S.removedAt = {}; S.note = null; S.err = null; }
   function begin() { S.note = null; }
@@ -461,7 +485,8 @@
     if (!a || busy) return;
     if (S.c.home.indexOf(id) >= 0) { c = next(S.c.home.slice(), S.c.recent.slice()); c.lastApp = id; write(c, 'Last app'); }
     S.press = id; S.lastLaunch = a.name;
-    perform(a.name, function (done) { FrameDevice.launchApp(a.appId, done); });
+    if (a.source) perform(a.name, function (done) { FrameDevice.source(a.source, function (err) { if (!err) S.sourceShown = a.id; done(err); }); });
+    else perform(a.name, function (done) { FrameDevice.launchApp(a.appId, done); });
   }
   function refreshCatalog() {
     var request, oldFocus;
@@ -491,15 +516,14 @@
   }
 
   /* ---------- Navigation targets ---------- */
-  function utils() { return ['art', 'apps', 'settings']; }
+  function utils() { return ['apps', 'settings']; }
   /* prev/next run along the apps; out goes to the controls, inn comes back (or to a per-app action). */
   function axes() {
     var v = S.c.layout === 'list';
     return { prev: v ? 'up' : 'left', next: v ? 'down' : 'right', out: v ? 'right' : 'up', inn: v ? 'left' : 'down' };
   }
   function utilAction(u) {
-    if (u === 'art') perform('Art Mode', FrameDevice.art);
-    else if (u === 'apps') openApps();
+    if (u === 'apps') openApps();
     else openSettings();
   }
   function addAppsRoute() { openEditor('home'); }
@@ -531,9 +555,21 @@
   var V = {};
 
   /* ---------- Home (browse) ---------- */
+  function closeSource() { perform('Back to Home', function (done) { FrameDevice.hideSource(function (err) { S.sourceShown = null; done(err); }); }); }
+  /* Q90T fork: the Home key rule re-launches this app while an input is shown
+     in-app. App-control delivery does not fire on Tizen 5.5, so any raw key
+     that reaches the app while a source is shown returns to the dashboard
+     (the Home key propagates here when the launch target is already on top). */
+  document.addEventListener('appcontrol', function () {
+    if (S && S.sourceShown) closeSource();
+  });
+  document.addEventListener('keydown', function (e) {
+    if (S.sourceShown && e.keyCode && e.keyCode !== 10009 && e.keyCode !== 461 && e.keyCode !== 27 && e.keyCode !== 8) closeSource();
+  });
   V.home = {
     key: function (t, k) {
       var f = t.f, h = S.c.home, U = utils(), x = axes(), i = ensureSel();
+      if (S.sourceShown) { if (k === 'back') closeSource(); return; }
       if (S.c.layout === 'list') { listHomeKey(t, k, i, U); return; }
       if (f.zone === 'util') {
         f.u = clamp(f.u, 0, U.length - 1);
