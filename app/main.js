@@ -373,10 +373,8 @@
     if (saved && initial.mode === 'open') initial.wall = WALLS[(wallIndex(initial.wall) + 1) % WALLS.length].id;
     // Keep the old schema keys alongside the builder values for in-place updates.
     try { localStorage.setItem(KEY, JSON.stringify(serialise(initial))); S.c = initial; storageOk = true; } catch (e) { storageOk = false; }
-    bootSourceNames();
+    registerHomeKey();
   }
-  /* Q90T fork: start the local EdidService bridge and pull its EDID-derived
-     input names. Fails silently; tiles keep their default names. */
   /* Q90T fork: try to grab the Home key natively so no carrier TPK is needed. */
   function registerHomeKey() {
     var names = ['Home', 'KEY_HOME', 'XF86Home'], registered = [];
@@ -388,23 +386,6 @@
       S.note = 'keygrab: ' + (registered.length ? registered.join(',') : 'none accepted');
       if (registered.length) S.homeKeys = registered;
     } catch (e) { S.note = 'keygrab failed'; }
-  }
-  function bootSourceNames() {
-    if (!FrameDevice || !FrameDevice.sourceNames) return;
-    registerHomeKey();
-    FrameDevice.launchApp('EdidServi1.EdidService', function () {});
-    window.setTimeout(function () { refreshSourceNames(); }, 2000);
-  }
-  function refreshSourceNames() {
-    FrameDevice.sourceNames(function (err, names) {
-      var changed = false, key;
-      if (err || !names) return;
-      for (key in names) {
-        var a = app(key), label = names[key];
-        if (a && label && a.name !== label) { a.name = label; changed = true; }
-      }
-      if (changed) render();
-    });
   }
   function clearSession() { S.undo = []; S.removedAt = {}; S.note = null; S.err = null; }
   function begin() { S.note = null; }

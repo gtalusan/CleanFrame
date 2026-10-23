@@ -16,8 +16,6 @@ firmware `T-KNMAKUC-REL-202505100505`. It is not a Frame TV.
 - **Home-button routing** comes from a separate minimal carrier package —
   [samsung-tizen-homekey](https://github.com/gtalusan/samsung-tizen-homekey) —
   because Tizen 5.x registers key rules only from TPK manifests.
-- Optional EDID-derived input names via a local dotnet bridge (parked: the
-  `G_EDID` control destabilizes this firmware).
 
 Verified on the device: tiles render, HDMI switching works, Settings opens,
 and the Home button lands on the launcher.

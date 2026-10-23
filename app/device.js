@@ -66,24 +66,6 @@
     try { tizen.tvwindow.hide(function () { finish(null); }, function (err) { finish(failure(err)); }, 'MAIN'); }
     catch (err) { finish(failure(err)); }
   }
-  /* Q90T fork: EDID-derived input names from the local EdidService bridge
-     (http://127.0.0.1:8787/). Fails gracefully when the service is absent. */
-  function sourceNames(done) {
-    var finish = bounded(done), xhr;
-    try {
-      xhr = new XMLHttpRequest();
-      xhr.open('GET', 'http://127.0.0.1:8787/', true);
-      xhr.timeout = 4000;
-      xhr.onload = function () {
-        if (xhr.status !== 200) { finish({ message: 'Name service unavailable.' }); return; }
-        try { finish(null, JSON.parse(xhr.responseText)); }
-        catch (e) { finish({ message: 'Name service returned bad data.' }); }
-      };
-      xhr.onerror = function () { finish({ message: 'Name service unavailable.' }); };
-      xhr.ontimeout = function () { finish({ message: 'Name service unavailable.' }); };
-      xhr.send();
-    } catch (e) { finish({ message: 'Name service unavailable.' }); }
-  }
   function home(done) { launchApp('com.samsung.tv.csfs', done); }
   function settings(done) { launchApp('com.samsung.tv.coba.setting', done); }
   function apps(done) {
@@ -107,5 +89,5 @@
       }, function (err) { finish(failure(err)); });
     } catch (err) { finish(failure(err)); }
   }
-  window.FrameDevice = { launch: launch, launchApp: launchApp, source: source, hideSource: hideSource, sourceNames: sourceNames, home: home, settings: settings, apps: apps };
+  window.FrameDevice = { launch: launch, launchApp: launchApp, source: source, hideSource: hideSource, home: home, settings: settings, apps: apps };
 }());
