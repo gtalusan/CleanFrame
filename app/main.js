@@ -377,8 +377,21 @@
   }
   /* Q90T fork: start the local EdidService bridge and pull its EDID-derived
      input names. Fails silently; tiles keep their default names. */
+  /* Q90T fork: try to grab the Home key natively so no carrier TPK is needed. */
+  function registerHomeKey() {
+    var names = ['Home', 'KEY_HOME', 'XF86Home'], registered = [];
+    try {
+      if (!window.tizen || !tizen.tvinputdevice) { S.note = 'keygrab: no tvinputdevice'; return; }
+      names.forEach(function (n) {
+        try { tizen.tvinputdevice.registerKey(n); registered.push(n); } catch (e) {}
+      });
+      S.note = 'keygrab: ' + (registered.length ? registered.join(',') : 'none accepted');
+      if (registered.length) S.homeKeys = registered;
+    } catch (e) { S.note = 'keygrab failed'; }
+  }
   function bootSourceNames() {
     if (!FrameDevice || !FrameDevice.sourceNames) return;
+    registerHomeKey();
     FrameDevice.launchApp('EdidServi1.EdidService', function () {});
     window.setTimeout(function () { refreshSourceNames(); }, 2000);
   }
