@@ -1,4 +1,30 @@
-# CleanFrame
+# CleanFrame — Q90T fork (Tizen 5.5)
+
+This fork targets the **Samsung QN55Q90TAFXZC (2020 Q90T, Tizen 5.5.0, armv7)**,
+firmware `T-KNMAKUC-REL-202505100505`. It is not a Frame TV.
+
+**What changed vs upstream CleanFrame:**
+
+- **Home is the HDMI inputs** (HDMI 1–4 tiles) plus the Settings control — the
+  streaming-app defaults are gone; the All apps panel and Apps on Home editor
+  remain for anything you add yourself.
+- **Inputs switch in-app**: selecting an HDMI tile shows the source
+  full-screen inside the launcher (Tizen 5.5 has no viewer app); Back returns
+  to the dashboard.
+- **Tizen 5.5 compatibility**: `required_version="5.5"`, `tv.window` +
+  `internet` privileges, Chromium-56-era CSS (no flex `gap`, no `inset`).
+- **Home-button routing** comes from a separate minimal carrier package —
+  [samsung-tizen-homekey](https://github.com/gtalusan/samsung-tizen-homekey) —
+  because Tizen 5.x registers key rules only from TPK manifests.
+- Optional EDID-derived input names via a local dotnet bridge (parked: the
+  `G_EDID` control destabilizes this firmware).
+
+Verified on the device: tiles render, HDMI switching works, Settings opens,
+and the Home button lands on the launcher.
+
+## Original upstream README
+
+
 
 A quieter home screen for Samsung The Frame. Your apps, a photograph and the time, with an interface made for the TV remote.
 
